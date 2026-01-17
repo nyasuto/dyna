@@ -1,15 +1,23 @@
 package main
 
 import (
+	"dynasty/oracle"
 	"dynasty/simulation"
+	"log"
 	"net/http"
 	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 )
 
 func main() {
+	// Load .env file if it exists
+	if err := godotenv.Load(); err != nil {
+		log.Println("No .env file found, relying on environment variables")
+	}
+
 	r := gin.Default()
 
 	// Configure CORS
@@ -23,24 +31,61 @@ func main() {
 	}))
 
 	r.POST("/api/simulation/start", func(c *gin.Context) {
-		// Default config for now
-		cfg := simulation.Config{
-			StartPrice: 1000000,
-			Years:      30,
-			Drift:      0.05, // 5% growth
-			Volatility: 0.20, // 20% volatility
-			NumPaths:   1000,
+		var cfg simulation.Config
+		// Bind JSON if sent, otherwise use defaults
+		if err := c.ShouldBindJSON(&cfg); err != nil {
+			// If invalid JSON, return error
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
 		}
 
-		// Run simulation (blocking for now to return results)
+		// Fill defaults if missing
+		if cfg.NumPaths == 0 {
+			cfg.NumPaths = 1000
+		}
+		if cfg.Years == 0 {
+			cfg.Years = 30
+		}
+		if cfg.StartPrice == 0 {
+			cfg.StartPrice = 1000000
+		}
+		if cfg.Volatility == 0 {
+			cfg.Volatility = 0.20
+		}
+		if cfg.Drift == 0 {
+			cfg.Drift = 0.05
+		}
+
+		// Run simulation
 		result := simulation.Run(cfg)
 
 		c.JSON(http.StatusOK, gin.H{
 			"message":         "Simulation completed",
 			"status":          "completed",
 			"config":          cfg,
-			"results_preview": result.Paths[0][len(result.Paths[0])-1], // Last value of first path
+			"results_preview": result.Paths[0][len(result.Paths[0])-1],
 			"paths_count":     len(result.Paths),
+		})
+	})
+
+	r.POST("/api/oracle/analyze", func(c *gin.Context) {
+		type Request struct {
+			Scenario string `json:"scenario"`
+		}
+		var req Request
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		mods, err := oracle.AnalyzeScenario(c.Request.Context(), req.Scenario)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"modifiers": mods,
 		})
 	})
 
