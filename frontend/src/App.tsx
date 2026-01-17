@@ -1,7 +1,11 @@
+// frontend/src/App.tsx
+
 import { useState } from 'react'
+import { AssetDashboard } from './components/AssetDashboard'
 import './index.css'
 
 function App() {
+  const [view, setView] = useState<'home' | 'dashboard'>('home')
   const [status, setStatus] = useState<string>('')
   const [loading, setLoading] = useState<boolean>(false)
 
@@ -22,6 +26,22 @@ function App() {
     }
   }
 
+  // Show dashboard view
+  if (view === 'dashboard') {
+    return (
+      <div className="relative">
+        <button
+          onClick={() => setView('home')}
+          className="absolute top-4 left-4 z-50 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg border border-gray-700 transition-all"
+        >
+          ← Back to Home
+        </button>
+        <AssetDashboard />
+      </div>
+    )
+  }
+
+  // Show home view (your original code)
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center p-4">
       <div className="max-w-md w-full bg-gray-800 rounded-xl shadow-2xl p-8 border border-gray-700">
@@ -54,6 +74,13 @@ function App() {
             ) : (
               'Run Simulation'
             )}
+          </button>
+
+          <button
+            onClick={() => setView('dashboard')}
+            className="w-full py-3 px-6 rounded-lg font-semibold border-2 border-emerald-500 text-emerald-400 hover:bg-emerald-500/10 transition-all duration-200 transform hover:scale-[1.02]"
+          >
+            📊 Open Analytics Dashboard
           </button>
           
           <p className="text-xs text-center text-gray-500">
