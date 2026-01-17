@@ -65,6 +65,7 @@ func main() {
 			"config":          cfg,
 			"results_preview": result.Paths[0][len(result.Paths[0])-1],
 			"paths_count":     len(result.Paths),
+			"paths":           result.Paths,
 		})
 	})
 
