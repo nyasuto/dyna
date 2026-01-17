@@ -1,64 +1,100 @@
 import { useState } from 'react'
-import './index.css'
+import { SimulationChart } from './components/dashboard/SimulationChart'
+import { ControlPanel } from './components/dashboard/ControlPanel'
+
+interface YearlyModifier {
+  year: number;
+  drift_mod: number;
+  volatility_mod: number;
+}
 
 function App() {
-  const [status, setStatus] = useState<string>('')
-  const [loading, setLoading] = useState<boolean>(false)
+  const [data, setData] = useState<number[][]>([])
+  const [modifiers, setModifiers] = useState<YearlyModifier[]>([])
+  
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [isRunning, setIsRunning] = useState(false)
 
-  const runSimulation = async () => {
-    setLoading(true)
-    setStatus('Running simulation...')
+  const handleAnalyze = async (scenario: string) => {
+    setIsAnalyzing(true)
     try {
-      const response = await fetch('http://localhost:8080/api/simulation/start', {
+      const res = await fetch('http://localhost:8080/api/oracle/analyze', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scenario }),
       })
-      const data = await response.json()
-      setStatus(data.message || 'Simulation complete')
-    } catch (error) {
-      console.error('Error:', error)
-      setStatus('Error running simulation')
+      const json = await res.json()
+      if (json.modifiers) {
+        setModifiers(json.modifiers)
+      }
+    } catch (e) {
+      console.error(e)
     } finally {
-      setLoading(false)
+      setIsAnalyzing(false)
+    }
+  }
+
+  const handleRun = async () => {
+    setIsRunning(true)
+    try {
+      const res = await fetch('http://localhost:8080/api/simulation/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          start_price: 1000000,
+          years: 30,
+          num_paths: 200, // Frontend limit for rendering check? Backend default is 1000. 
+                         // To draw 1000 lines is heavy for SVG/Canvas. Let's request 1000 but only draw 50 in Chart component.
+                         // But we need the data.
+          modifiers: modifiers
+        }),
+      })
+      const json = await res.json()
+      // result.Paths is in json.results_preview? No.
+      // Wait, main.go only returned results_preview (single float) and paths_count.
+      // It did NOT return the full paths to save bandwidth in the previous step verification!
+      // I need to update backend/main.go to return full paths if I want to draw them.
+      // Or at least return "paths" field.
+      // Currently backend returns: result.Paths[0][last] as preview.
+      // We need to FIX BACKEND to return data for chart.
+      
+      // Temporary check: If backend doesn't return paths, chart won't work.
+      // I should assume I need to fix backend.
+      if (json.paths) {
+          setData(json.paths)
+      } else {
+          // Fallback or alert if backend isn't ready
+          console.warn("No paths returned from backend. Check main.go")
+      }
+    } catch (e) {
+        console.error(e)
+    } finally {
+      setIsRunning(false)
     }
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center p-4">
-      <div className="max-w-md w-full bg-gray-800 rounded-xl shadow-2xl p-8 border border-gray-700">
-        <h1 className="text-3xl font-bold mb-6 text-center bg-gradient-to-r from-blue-400 to-emerald-400 text-transparent bg-clip-text">
+    <div className="min-h-screen bg-gray-900 text-white p-6">
+      <header className="mb-8">
+        <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-emerald-400 text-transparent bg-clip-text">
           Project Dynasty
         </h1>
-        
-        <div className="space-y-6">
-          <div className="bg-gray-900/50 rounded-lg p-4 h-32 flex items-center justify-center border border-gray-700 font-mono text-lg">
-            {status || <span className="text-gray-500">Ready to simulate</span>}
-          </div>
+        <p className="text-gray-400">High-Performance Asset Simulation</p>
+      </header>
 
-          <button
-            onClick={runSimulation}
-            disabled={loading}
-            className={`w-full py-4 px-6 rounded-lg font-bold text-lg transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98] ${
-              loading
-                ? 'bg-gray-600 cursor-not-allowed opacity-50'
-                : 'bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-500 hover:to-emerald-500 shadow-lg shadow-blue-500/20'
-            }`}
-          >
-            {loading ? (
-              <span className="flex items-center justify-center gap-2">
-                <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                </svg>
-                Processing Asset Model...
-              </span>
-            ) : (
-              'Run Simulation'
-            )}
-          </button>
-          
-          <p className="text-xs text-center text-gray-500">
-            Powered by Mac mini M4 Pro & Gemini 2.0 Flash
-          </p>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-1">
+          <ControlPanel 
+            onAnalyze={handleAnalyze} 
+            onRun={handleRun}
+            isAnalyzing={isAnalyzing}
+            isRunning={isRunning}
+            modifiers={modifiers}
+          />
+        </div>
+        
+        <div className="lg:col-span-2">
+          <SimulationChart data={data} />
         </div>
       </div>
     </div>
