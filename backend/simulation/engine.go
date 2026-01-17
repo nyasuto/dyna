@@ -7,13 +7,21 @@ import (
 	"sync"
 )
 
+// YearlyModifier represents the adjustment for a specific year.
+type YearlyModifier struct {
+	Year          int     `json:"year"`
+	DriftMod      float64 `json:"drift_mod"`
+	VolatilityMod float64 `json:"volatility_mod"`
+}
+
 // Config holds the parameters for the simulation.
 type Config struct {
-	StartPrice float64 `json:"start_price"`
-	Years      int     `json:"years"`
-	Drift      float64 `json:"drift"`      // Annual drift (mu)
-	Volatility float64 `json:"volatility"` // Annual volatility (sigma)
-	NumPaths   int     `json:"num_paths"`  // Number of simulation paths
+	StartPrice float64          `json:"start_price"`
+	Years      int              `json:"years"`
+	Drift      float64          `json:"drift"`      // Annual drift (mu)
+	Volatility float64          `json:"volatility"` // Annual volatility (sigma)
+	NumPaths   int              `json:"num_paths"`  // Number of simulation paths
+	Modifiers  []YearlyModifier `json:"modifiers"`  // Optional yearly modifiers
 }
 
 // Result holds the output of the simulation.
@@ -36,20 +44,17 @@ func Run(cfg Config) Result {
 	totalSteps := cfg.Years * stepsPerYear
 	dt := 1.0 / float64(stepsPerYear)
 
-	// Pre-calculate constants
-	driftTerm := (cfg.Drift - 0.5*cfg.Volatility*cfg.Volatility) * dt
-	volBlob := cfg.Volatility * math.Sqrt(dt)
+	// Base constants
+	baseDrift := cfg.Drift
+	baseVol := cfg.Volatility
 
 	numCPU := runtime.NumCPU()
 	runtime.GOMAXPROCS(numCPU)
 
 	// Prepare result container
-	// Note: For very large NumPaths, we might want to aggregate stats instead of storing all paths
-	// to save memory. For now, we store all.
 	paths := make([][]float64, cfg.NumPaths)
 
 	var wg sync.WaitGroup
-	// Chunk processing
 	chunkSize := (cfg.NumPaths + numCPU - 1) / numCPU
 
 	for i := 0; i < numCPU; i++ {
@@ -75,10 +80,27 @@ func Run(cfg Config) Result {
 				current := cfg.StartPrice
 
 				for t := 1; t <= totalSteps; t++ {
-					// GBM Geometric Brownian Motion
-					// S_t = S_{t-1} * exp( (mu - 0.5*sigma^2)*dt + sigma*sqrt(dt)*Z )
+					// Determine year (1-based)
+					year := (t-1)/stepsPerYear + 1
+
+					d := baseDrift
+					v := baseVol
+
+					// Apply modifiers
+					for _, mod := range cfg.Modifiers {
+						if mod.Year == year {
+							d += mod.DriftMod
+							v += mod.VolatilityMod
+							break
+						}
+					}
+
+					// Calculate GBM step
+					term := (d - 0.5*v*v) * dt
+					vol := v * math.Sqrt(dt)
+
 					z := src.NormFloat64()
-					change := driftTerm + volBlob*z
+					change := term + vol*z
 					current *= math.Exp(change)
 					path[t] = current
 				}
