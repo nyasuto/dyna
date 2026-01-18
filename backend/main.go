@@ -1,6 +1,7 @@
 package main
 
 import (
+	"dynasty/db"
 	"dynasty/oracle"
 	"dynasty/simulation"
 	"log"
@@ -13,6 +14,9 @@ import (
 )
 
 func main() {
+	// Initialize Database
+	db.Init("dynasty.db")
+
 	// Load .env file if it exists
 	if err := godotenv.Load(); err != nil {
 		log.Println("No .env file found, relying on environment variables")
@@ -67,6 +71,31 @@ func main() {
 			"paths_count":     len(result.Paths),
 			"paths":           result.Paths,
 		})
+
+		// Save to DB (Async to not block response? Or sync is fine for SQLite)
+		// Summary: just saving paths_count and last value for now, or maybe full Result if we want.
+		// Let's save a summary map.
+		summary := map[string]interface{}{
+			"paths_count":        len(result.Paths),
+			"last_value_preview": result.Paths[0][len(result.Paths[0])-1],
+		}
+		// Scenario is not in Config currently... user passed scenario to /analyze, but /start just gets params.
+		// We could pass scenario text in Config if we want to track it?
+		// For now, save "" if not provided.
+		go func() {
+			if err := db.SaveSimulation("", cfg, summary); err != nil {
+				log.Printf("Failed to save simulation: %v", err)
+			}
+		}()
+	})
+
+	r.GET("/api/history", func(c *gin.Context) {
+		history, err := db.GetHistory()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"history": history})
 	})
 
 	r.POST("/api/oracle/analyze", func(c *gin.Context) {
