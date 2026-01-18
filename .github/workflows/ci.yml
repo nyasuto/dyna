@@ -51,3 +51,10 @@ jobs:
 
     - name: Build
       run: npm run build
+
+  ci-complete:
+    name: CI Complete
+    needs: [backend-test, frontend-build]
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "All CI jobs passed successfully."
