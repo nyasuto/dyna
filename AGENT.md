@@ -39,6 +39,7 @@
 5. **Git Workflow**:
     - `gh pr create` を実行する前に、必ず `git push -u origin <branch>` でブランチをプッシュすること。対話モードによるハングアップを防ぐため。
     - **PR作成時のルール**: `gh pr create --body "..."` の使用は禁止（改行コードが正しく扱われないため）。必ず `--body-file <file>` を使用するか、エディタを立ち上げて記述すること。
+    - **クリーンアップ**: PR作成に使用した一時ファイル（`pr_*.md` など）は、作成後に必ず削除すること。プロジェクトルートを汚さないため。
 
 ## 5. Specific Constraints
 - **Gemini Usage**: API呼び出しは高価なため、シミュレーションループの内側（Inner Loop）で呼んではならない。ループの前処理（Pre-calculation）として呼ぶこと。
