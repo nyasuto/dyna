@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { SimulationChart } from './components/dashboard/SimulationChart'
 import { ControlPanel } from './components/dashboard/ControlPanel'
 import { HistoryPanel } from './components/dashboard/HistoryPanel'
+import { RiskStats } from './components/dashboard/RiskStats'
 
 interface YearlyModifier {
   year: number;
@@ -12,6 +13,7 @@ interface YearlyModifier {
 function App() {
   const [data, setData] = useState<number[][]>([])
   const [modifiers, setModifiers] = useState<YearlyModifier[]>([])
+  const [riskMetrics, setRiskMetrics] = useState<any>(null)
   
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [isRunning, setIsRunning] = useState(false)
@@ -50,21 +52,15 @@ function App() {
         }),
       })
       const json = await res.json()
-      // result.Paths is in json.results_preview? No.
-      // Wait, main.go only returned results_preview (single float) and paths_count.
-      // It did NOT return the full paths to save bandwidth in the previous step verification!
-      // I need to update backend/main.go to return full paths if I want to draw them.
-      // Or at least return "paths" field.
-      // Currently backend returns: result.Paths[0][last] as preview.
-      // We need to FIX BACKEND to return data for chart.
       
-      // Temporary check: If backend doesn't return paths, chart won't work.
-      // I should assume I need to fix backend.
       if (json.paths) {
           setData(json.paths)
       } else {
-          // Fallback or alert if backend isn't ready
-          console.warn("No paths returned from backend. Check main.go")
+          console.warn("No paths returned from backend.")
+      }
+
+      if (json.risk_metrics) {
+        setRiskMetrics(json.risk_metrics)
       }
     } catch (e) {
         console.error(e)
@@ -74,20 +70,11 @@ function App() {
   }
 
   const handleLoadConfig = (config: any) => {
-    // Ideally we pass this config to ControlPanel to update its state.
-    // However, ControlPanel state is internal.
-    // We need to either lift state up or expose a ref/method.
-    // For now, let's just log it or set modifiers if present.
-    // If we want to fully reload, we should lift state from ControlPanel to App.
-    // But that's a big refactor.
-    // Simple solution: pass 'initialConfig' prop to ControlPanel? 
-    // Or just updating 'modifiers' which IS in App state.
     if (config.modifiers) {
         setModifiers(config.modifiers);
     }
-    // We can't update Jump params or internal scenario text easily without lifting state.
     console.log("Loaded config:", config);
-    alert("Modifiers loaded! (Jump params loading requires refactor)");
+    alert("Modifiers loaded!");
   }
 
   return (
@@ -115,8 +102,13 @@ function App() {
           </div>
         </div>
         
-        <div className="lg:col-span-3 h-full">
-          <SimulationChart data={data} />
+        <div className="lg:col-span-3 h-full flex flex-col gap-6">
+          <div className="flex-1 min-h-0 bg-gray-800 rounded-xl p-4 border border-gray-700">
+             <SimulationChart data={data} />
+          </div>
+          <div>
+            <RiskStats metrics={riskMetrics} initialValue={1000000} />
+          </div>
         </div>
       </div>
     </div>

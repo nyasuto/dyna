@@ -70,6 +70,7 @@ func main() {
 			"results_preview": result.Paths[0][len(result.Paths[0])-1],
 			"paths_count":     len(result.Paths),
 			"paths":           result.Paths,
+			"risk_metrics":    result.RiskMetrics,
 		})
 
 		// Save to DB (Async to not block response? Or sync is fine for SQLite)
@@ -78,6 +79,7 @@ func main() {
 		summary := map[string]interface{}{
 			"paths_count":        len(result.Paths),
 			"last_value_preview": result.Paths[0][len(result.Paths[0])-1],
+			"risk_metrics":       result.RiskMetrics,
 		}
 		// Scenario is not in Config currently... user passed scenario to /analyze, but /start just gets params.
 		// We could pass scenario text in Config if we want to track it?

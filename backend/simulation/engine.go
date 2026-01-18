@@ -1,6 +1,7 @@
 package simulation
 
 import (
+	"dynasty/analytics"
 	"math"
 	"math/rand/v2"
 	"runtime"
@@ -29,13 +30,14 @@ type Config struct {
 	JumpStdDev    float64 `json:"jump_std_dev"`   // StdDev of log jump size
 }
 
-// Result holds the output of the simulation.
-type Result struct {
-	Paths [][]float64 `json:"paths"` // [PathIndex][TimeStep]
+// SimulationResult holds the output of the simulation.
+type SimulationResult struct {
+	Paths       [][]float64           `json:"paths"` // [PathIndex][TimeStep]
+	RiskMetrics analytics.RiskMetrics `json:"risk_metrics"`
 }
 
 // Run executes the GBM simulation with optional Jump Diffusion.
-func Run(cfg Config) Result {
+func Run(cfg Config) SimulationResult {
 	// Defaults
 	if cfg.NumPaths == 0 {
 		cfg.NumPaths = 1000
@@ -150,5 +152,17 @@ func Run(cfg Config) Result {
 
 	wg.Wait()
 
-	return Result{Paths: paths}
+	// Calculate Risk Metrics
+	finalValues := make([]float64, len(paths))
+	for i, path := range paths {
+		if len(path) > 0 {
+			finalValues[i] = path[len(path)-1]
+		}
+	}
+	riskMetrics := analytics.CalculateRiskMetrics(finalValues)
+
+	return SimulationResult{
+		Paths:       paths,
+		RiskMetrics: riskMetrics,
+	}
 }
