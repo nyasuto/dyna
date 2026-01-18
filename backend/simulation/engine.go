@@ -22,6 +22,11 @@ type Config struct {
 	Volatility float64          `json:"volatility"` // Annual volatility (sigma)
 	NumPaths   int              `json:"num_paths"`  // Number of simulation paths
 	Modifiers  []YearlyModifier `json:"modifiers"`  // Optional yearly modifiers
+
+	// Jump Diffusion Parameters (Merton Model)
+	JumpIntensity float64 `json:"jump_intensity"` // Lambda: Expected jumps per year
+	JumpMean      float64 `json:"jump_mean"`      // Mean of log jump size
+	JumpStdDev    float64 `json:"jump_std_dev"`   // StdDev of log jump size
 }
 
 // Result holds the output of the simulation.
@@ -29,7 +34,7 @@ type Result struct {
 	Paths [][]float64 `json:"paths"` // [PathIndex][TimeStep]
 }
 
-// Run executes the GBM simulation.
+// Run executes the GBM simulation with optional Jump Diffusion.
 func Run(cfg Config) Result {
 	// Defaults
 	if cfg.NumPaths == 0 {
@@ -47,6 +52,12 @@ func Run(cfg Config) Result {
 	// Base constants
 	baseDrift := cfg.Drift
 	baseVol := cfg.Volatility
+
+	// Pre-calculate Jump Drift Correction if needed?
+	// Merton model drift assumption: usually mu includes the compensation or not.
+	// We will assume 'Drift' passed by user is the TOTAL drift or just the diffusion part?
+	// Standard: mu is total expected return?
+	// Let's keep it simple: Drift is diffusion drift, and Jumps are added on top (risk factors).
 
 	numCPU := runtime.NumCPU()
 	runtime.GOMAXPROCS(numCPU)
@@ -95,12 +106,40 @@ func Run(cfg Config) Result {
 						}
 					}
 
-					// Calculate GBM step
+					// 1. Diffusion Component (GBM)
+					// dS/S = mu*dt + sigma*dW
+					// In log: d(ln S) = (mu - 0.5*sigma^2)*dt + sigma*dW
 					term := (d - 0.5*v*v) * dt
 					vol := v * math.Sqrt(dt)
-
 					z := src.NormFloat64()
-					change := term + vol*z
+					diffusion := term + vol*z
+
+					// 2. Jump Component (Poisson Process)
+					jumpEffect := 0.0
+					if cfg.JumpIntensity > 0 {
+						// Knuth's algorithm for Poisson distribution
+						// Generate number of jumps N in time dt
+						L := math.Exp(-cfg.JumpIntensity * dt)
+						k := 0
+						p := 1.0
+						for p > L {
+							k++
+							p *= src.Float64()
+						}
+						k = k - 1 // Number of jumps
+
+						if k > 0 {
+							// Sum of k log-normal jumps
+							// Each jump J ~ Normal(JumpMean, JumpStdDev) in log space
+							// Sum ~ Normal(k * JumpMean, sqrt(k) * JumpStdDev)
+							jumpMean := float64(k) * cfg.JumpMean
+							jumpStd := math.Sqrt(float64(k)) * cfg.JumpStdDev
+							jumpZ := src.NormFloat64()
+							jumpEffect = jumpMean + jumpStd*jumpZ
+						}
+					}
+
+					change := diffusion + jumpEffect
 					current *= math.Exp(change)
 					path[t] = current
 				}

@@ -34,7 +34,7 @@ function App() {
     }
   }
 
-  const handleRun = async () => {
+  const handleRun = async (jumpParams: { jump_intensity: number; jump_mean: number; jump_std_dev: number }) => {
     setIsRunning(true)
     try {
       const res = await fetch('http://localhost:8080/api/simulation/start', {
@@ -43,10 +43,9 @@ function App() {
         body: JSON.stringify({
           start_price: 1000000,
           years: 30,
-          num_paths: 200, // Frontend limit for rendering check? Backend default is 1000. 
-                         // To draw 1000 lines is heavy for SVG/Canvas. Let's request 1000 but only draw 50 in Chart component.
-                         // But we need the data.
-          modifiers: modifiers
+          num_paths: 200, 
+          modifiers: modifiers,
+          ...jumpParams
         }),
       })
       const json = await res.json()
