@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { SimulationChart } from './components/dashboard/SimulationChart'
 import { ControlPanel } from './components/dashboard/ControlPanel'
+import { HistoryPanel } from './components/dashboard/HistoryPanel'
 
 interface YearlyModifier {
   year: number;
@@ -72,6 +73,23 @@ function App() {
     }
   }
 
+  const handleLoadConfig = (config: any) => {
+    // Ideally we pass this config to ControlPanel to update its state.
+    // However, ControlPanel state is internal.
+    // We need to either lift state up or expose a ref/method.
+    // For now, let's just log it or set modifiers if present.
+    // If we want to fully reload, we should lift state from ControlPanel to App.
+    // But that's a big refactor.
+    // Simple solution: pass 'initialConfig' prop to ControlPanel? 
+    // Or just updating 'modifiers' which IS in App state.
+    if (config.modifiers) {
+        setModifiers(config.modifiers);
+    }
+    // We can't update Jump params or internal scenario text easily without lifting state.
+    console.log("Loaded config:", config);
+    alert("Modifiers loaded! (Jump params loading requires refactor)");
+  }
+
   return (
     <div className="min-h-screen bg-gray-900 text-white p-6">
       <header className="mb-8">
@@ -81,18 +99,23 @@ function App() {
         <p className="text-gray-400">High-Performance Asset Simulation</p>
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-1">
-          <ControlPanel 
-            onAnalyze={handleAnalyze} 
-            onRun={handleRun}
-            isAnalyzing={isAnalyzing}
-            isRunning={isRunning}
-            modifiers={modifiers}
-          />
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-[calc(100vh-140px)]">
+        <div className="lg:col-span-1 flex flex-col gap-6 h-full overflow-hidden">
+          <div className="flex-1 min-h-0">
+             <ControlPanel 
+                onAnalyze={handleAnalyze} 
+                onRun={handleRun}
+                isAnalyzing={isAnalyzing}
+                isRunning={isRunning}
+                modifiers={modifiers}
+              />
+          </div>
+          <div className="flex-1 min-h-0">
+             <HistoryPanel onLoadConfig={handleLoadConfig} />
+          </div>
         </div>
         
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-3 h-full">
           <SimulationChart data={data} />
         </div>
       </div>
