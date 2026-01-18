@@ -6,6 +6,7 @@ import (
 	"dynasty/simulation"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -14,13 +15,17 @@ import (
 )
 
 func main() {
-	// Initialize Database
-	db.Init("dynasty.db")
-
 	// Load .env file if it exists
 	if err := godotenv.Load(); err != nil {
 		log.Println("No .env file found, relying on environment variables")
 	}
+
+	// Initialize Database
+	dbPath := os.Getenv("DB_PATH")
+	if dbPath == "" {
+		dbPath = "dynasty.db"
+	}
+	db.Init(dbPath)
 
 	r := gin.Default()
 
